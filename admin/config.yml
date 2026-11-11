@@ -2,18 +2,16 @@ backend:
   name: git-gateway
   branch: main
 
-media_folder: "images"
-public_folder: "/images"
+media_folder: "images/uploads"
+public_folder: "/images/uploads"
 
 collections:
-    - name: "settings"
-    label: "إعدادات الموقع"
+    - name: "pages"
+    label: "الصفحات"
     files:
-            - name: "general"
-        label: "الإعدادات العامة"
-        file: "content/settings.json"
+            - name: "home"
+        label: "الصفحة الرئيسية"
+        file: "index.html"
         fields:
-                    - {label: "سعر المنتج", name: "price", widget: "string", default: "8900"}
-                    - {label: "السعر القديم", name: "old_price", widget: "string", default: "12900"}
-                    - {label: "رقم واتساب", name: "whatsapp", widget: "string", default: "213000000000"}
-                    - {label: "عنوان المنتج", name: "title", widget: "string", default: "مدفأة كهربائية 2 في 1"}
+                    - {label: "العنوان", name: "title", widget: "string"}
+                    - {label: "المحتوى", name: "body", widget: "markdown"}
