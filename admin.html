@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة التحكم</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--o:#FF6B00;--n:#1A2A3A;--l:#e3e8ec}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:#f4f6f8;font-size:16px;font-family:Tajawal,Arial,sans-serif;color:#17212b}
+button,input,textarea{font-family:inherit;font-size:16px}
+header{background:var(--n);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+header b{font:800 18px Cairo,sans-serif}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;background:#fff;border-bottom:1px solid var(--l);position:sticky;top:0;z-index:5}
+nav button{white-space:nowrap;border:1px solid var(--l);background:#fff;border-radius:99px;padding:8px 14px;font-weight:700;font-size:14px;cursor:pointer}
+nav button.on{background:var(--o);color:#fff;border-color:var(--o)}
+.w{max-width:820px;margin:auto;padding:14px 14px 100px}
+label{display:block;font-weight:700;font-size:14px;margin:0 0 12px}
+input,textarea{display:block;width:100%;margin-top:5px;padding:11px 12px;border:1px solid #d5dce1;border-radius:10px;background:#fff}
+textarea{min-height:84px;resize:vertical}
+.card{background:#fff;border:1px solid var(--l);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.b{border:0;border-radius:10px;padding:10px 16px;background:var(--o);color:#fff;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block}
+.b.g{background:#eef1f4;color:var(--n)}
+.b.r{background:#fde8e8;color:#b42318}
+.b:disabled{opacity:.35;cursor:default}
+.bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--l);padding:10px 14px;display:flex;gap:10px;justify-content:center;z-index:9}
+.p{display:block;width:100%;max-height:200px;object-fit:contain;background:#f1f3f5;border-radius:10px;margin-bottom:8px}
+.hint{font-size:13px;color:#65717d;margin:0 0 12px;line-height:1.7}
+#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);color:#fff;padding:10px 18px;border-radius:10px;z-index:99;display:none;max-width:92%;text-align:center}
+#lg{max-width:440px;margin:7vh auto;padding:0 14px}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="lg">
+  <div class="card">
+    <h2 style="font-family:Cairo;margin:0 0 6px">🔐 دخول لوحة التحكم</h2>
+    <p class="hint">الدخول يتم بمفتاح GitHub خاص بك، يُحفظ في متصفحك فقط. ولا أحد غيرك يستطيع التعديل حتى لو عرف رابط هذه الصفحة.</p>
+    <label>مفتاح GitHub (Token)<input id="tk" type="password" autocomplete="off" placeholder="github_pat_..."></label>
+    <label>المستودع<input id="rp" value="midfaa326/midfaa2fi1" dir="ltr"></label>
+    <label>الفرع<input id="br" value="main" dir="ltr"></label>
+    <button class="b" data-a="login" style="width:100%">دخول</button>
+    <p class="hint" style="margin-top:14px"><b>كيف تنشئ المفتاح؟</b> GitHub ← Settings ← Developer settings ← Personal access tokens ← Fine-grained tokens ← Generate new token. اختر المستودع <b dir="ltr">midfaa2fi1</b> فقط، وفي Permissions اجعل <b dir="ltr">Contents = Read and write</b>. ثم انسخ المفتاح هنا.</p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header><b>⚙️ لوحة تحكم الصفحة</b><div class="row"><a class="b g" href="index.html" target="_blank">معاينة</a><button class="b g" data-a="out">خروج</button></div></header>
+  <nav id="nav"></nav>
+  <div class="w" id="main"></div>
+  <div class="bar"><button class="b" data-a="save" style="min-width:60%">💾 حفظ ونشر التعديلات</button></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const enc=s=>btoa(unescape(encodeURIComponent(s))),dec=s=>decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
+let S=JSON.parse(localStorage.adm||'null'),C={},L={},hero='',sha=null,tab='g',P={},dirty=false;
+const mark=(v=true)=>dirty=v;
+const toast=(m,bad)=>{const t=$('#toast');t.textContent=m;t.style.background=bad?'#b42318':'#1A2A3A';t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4000)};
+
+async function api(p,o={}){
+  const r=await fetch('https://api.github.com/repos/'+S.repo+'/'+p,{...o,headers:{Authorization:'Bearer '+S.token,Accept:'application/vnd.github+json',...o.headers}});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(r.status+' '+(j.message||''));
+  return j;
+}
+
+async function load(){
+  try{
+    const j=await api('contents/settings.js?ref='+S.branch);
+    sha=j.sha;const w={};new Function('window',dec(j.content))(w);C=w.LANDING_CONFIG||{};
+  }catch(e){if(!/^404/.test(e.message))throw e;sha=null;C={}}
+  const m=C.media||{};hero=m.heroImage||'';
+  L={features:C.features||[],faqs:C.faqs||[],fees:Object.entries(C.deliveryFees||{}).map(([n,p])=>({n,p})),gallery:m.gallery||[],videos:m.videos||[]};
+  draw();
+}
+
+function build(){
+  const o={...C};
+  ['features','faqs','deliveryFees','media'].forEach(k=>delete o[k]);
+  Object.keys(o).forEach(k=>{if(o[k]===''||o[k]==null||(Array.isArray(o[k])&&!o[k].length))delete o[k]});
+  if(L.features.length)o.features=L.features;
+  if(L.faqs.length)o.faqs=L.faqs;
+  const f={};L.fees.forEach(x=>{if(x.n&&x.p!=='')f[x.n.trim()]=+x.p});
+  if(Object.keys(f).length)o.deliveryFees=f;
+  const m={};if(hero)m.heroImage=hero;if(L.gallery.length)m.gallery=L.gallery;if(L.videos.length)m.videos=L.videos;
+  if(Object.keys(m).length)o.media=m;
+  return o;
+}
+
+async function save(){
+  try{
+    toast('جارٍ الحفظ...');
+    const txt='/* تم التحديث من لوحة التحكم (admin.html) */\nwindow.LANDING_CONFIG = '+JSON.stringify(build(),null,2)+';\n';
+    const r=await api('contents/settings.js',{method:'PUT',body:JSON.stringify({message:'تحديث الإعدادات من لوحة التحكم',content:enc(txt),branch:S.branch,...(sha?{sha}:{})})});
+    sha=r.content.sha;mark(false);toast('تم الحفظ ✓ — يظهر على الموقع خلال دقيقة تقريبًا');
+  }catch(e){toast('فشل الحفظ: '+e.message,1)}
+}
+
+async function shrink(f){
+  try{
+    const bm=await createImageBitmap(f),k=Math.min(1,1600/Math.max(bm.width,bm.height)),c=document.createElement('canvas');
+    c.width=bm.width*k;c.height=bm.height*k;c.getContext('2d').drawImage(bm,0,0,c.width,c.height);
+    const b=await new Promise(r=>c.toBlob(r,'image/webp',.86));
+    return b&&b.size<f.size?b:f;
+  }catch(e){return f}
+}
+
+async function up(file,img){
+  let blob=file,ext=file.name.split('.').pop().toLowerCase();
+  if(img&&/^image\/(jpe?g|png|webp)/.test(file.type)){blob=await shrink(file);if(blob!==file)ext='webp'}
+  if(blob.size>25e6)throw Error('الملف أكبر من 25MB، قلّل حجمه');
+  const name='media/'+Date.now()+'-'+Math.random().toString(36).slice(2,6)+'.'+ext;
+  const b64=await new Promise(r=>{const f=new FileReader;f.onload=()=>r(f.result.split(',')[1]);f.readAsDataURL(blob)});
+  await api('contents/'+name,{method:'PUT',body:JSON.stringify({message:'رفع ملف وسائط',content:b64,branch:S.branch})});
+  P[name]=URL.createObjectURL(blob);return name;
+}
+
+/* ===== الحقول ===== */
+const FG=[['productName','اسم المنتج'],['productPrice','السعر (دج)','n'],['oldPrice','السعر القديم (0 = إخفاؤه)','n'],['giftText','نص الهدية في قسم العرض'],['giftShort','الهدية في رسالة واتساب'],['stockText','نص المخزون'],['whatsappNumber','رقم واتساب (بصيغة 213...)'],['metaPixelId','Meta Pixel ID'],['ga4MeasurementId','Google Analytics ID (اختياري)'],['pageTitle','عنوان الصفحة (التبويب)'],['metaDescription','وصف الصفحة لمحركات البحث','a']];
+const FT=[['topNotice','الشريط العلوي'],['heroBadge','الشارة فوق العنوان'],['heroTitle','العنوان الرئيسي'],['heroLead','الوصف تحت العنوان','a'],['heroChips','الشارات الصغيرة (سطر لكل شارة)','l'],['microTrust','سطر الثقة تحت الزر'],['primaryCta','نص أزرار الطلب'],['featuresTitle','عنوان قسم المزايا'],['offerTitle','عنوان قسم العرض'],['otherShippingNote','ملاحظة الولايات الأخرى','a'],['orderTitle','عنوان قسم الطلب'],['orderIntroText','نص قسم الطلب','a'],['orderGiftText','سطر الهدية في الطلب'],['finalTitle','العنوان الختامي'],['finalDescription','الوصف الختامي','a'],['finalCta','الزر الختامي'],['footerText','نص أسفل الصفحة','a']];
+
+const fld=([k,l,t])=>{
+  const v=t==='l'?(C[k]||[]).join('\n'):C[k]??'',a=`data-k="${k}" data-t="${t||''}"`;
+  return `<label>${l}${t==='a'||t==='l'?`<textarea ${a}>${esc(v)}</textarea>`:`<input ${a} ${t==='n'?'type="number" inputmode="numeric"':''} value="${esc(v)}">`}</label>`;
+};
+const inp=(n,i,f,l)=>`<label>${l}<input data-l="${n}" data-i="${i}" data-f="${f}" value="${esc(L[n][i][f])}"></label>`;
+const ta=(n,i,f,l)=>`<label>${l}<textarea data-l="${n}" data-i="${i}" data-f="${f}">${esc(L[n][i][f])}</textarea></label>`;
+const ctl=(n,i,len)=>`<div class="row"><button class="b g" data-a="mv" data-n="${n}" data-i="${i}" data-d="-1" ${i?'':'disabled'}>↑</button><button class="b g" data-a="mv" data-n="${n}" data-i="${i}" data-d="1" ${i<len-1?'':'disabled'}>↓</button><button class="b r" data-a="del" data-n="${n}" data-i="${i}">حذف</button></div>`;
+const lst=(n,fn,add)=>L[n].map((x,i)=>`<div class="card">${fn(x,i)}${ctl(n,i,L[n].length)}</div>`).join('')+add;
+const addBtn=(n,t)=>`<button class="b" data-a="add" data-n="${n}">+ ${t}</button>`;
+const upBtn=(w,t,acc,multi)=>`<label class="b" style="margin:0;cursor:pointer">${t}<input type="file" hidden ${multi?'multiple':''} accept="${acc}" data-up="${w}"></label>`;
+const src=x=>esc(P[x.src]||x.src);
+
+const T={g:'عام',t:'النصوص',f:'المزايا',q:'الأسئلة',s:'التوصيل',m:'الصور والفيديو'};
+const V={
+  g:()=>`<div class="card">${FG.map(fld).join('')}</div>`,
+  t:()=>`<p class="hint">اترك الحقل فارغًا ليبقى النص الأصلي في الصفحة. يمكنك استعمال <b dir="ltr">{{price}}</b> و <b dir="ltr">{{oldPrice}}</b> لإدراج السعر تلقائيًا.</p><div class="card">${FT.map(fld).join('')}</div>`,
+  f:()=>`<p class="hint">إذا لم تضف أي ميزة تبقى المزايا الأصلية كما هي.</p>`+lst('features',(x,i)=>inp('features',i,'icon','الأيقونة (إيموجي)')+inp('features',i,'title','العنوان')+ta('features',i,'text','الوصف'),addBtn('features','إضافة ميزة')),
+  q:()=>`<p class="hint">إذا لم تضف أي سؤال تبقى الأسئلة الأصلية كما هي.</p>`+lst('faqs',(x,i)=>inp('faqs',i,'q','السؤال')+ta('faqs',i,'a','الجواب'),addBtn('faqs','إضافة سؤال')),
+  s:()=>`<p class="hint">اكتب اسم الولاية بالعربية كما في قائمة الاستمارة (مثل: جيجل). الولايات غير المذكورة يُؤكَّد سعرها يدويًا.</p>`+lst('fees',(x,i)=>inp('fees',i,'n','الولاية')+inp('fees',i,'p','سعر التوصيل (دج)'),addBtn('fees','إضافة ولاية')),
+  m:()=>`<h3>الصورة الرئيسية</h3><div class="card">${hero?`<img class="p" src="${esc(P[hero]||hero)}">`:''}<label>مسار الصورة أو رابطها<input data-h="1" value="${esc(hero)}" dir="ltr"></label>${upBtn('hero','📷 رفع صورة رئيسية','image/*')}</div>
+  <h3>معرض الصور</h3>${lst('gallery',(x,i)=>`<img class="p" src="${src(x)}">`+inp('gallery',i,'caption','التعليق تحت الصورة')+inp('gallery',i,'src','المسار'),'')}${upBtn('gallery','📷 رفع صور (يمكن اختيار عدة صور)','image/*',1)}
+  <h3 style="margin-top:22px">الفيديوهات</h3>${lst('videos',(x,i)=>`<video class="p" controls preload="metadata" src="${src(x)}"></video>`+inp('videos',i,'caption','التعليق')+inp('videos',i,'src','المسار أو الرابط')+inp('videos',i,'poster','صورة الغلاف (اختياري)'),'')}${upBtn('videos','🎬 رفع فيديو (حتى 25MB)','video/*')}
+  <p class="hint" style="margin-top:12px">الصور تُصغَّر وتُحوَّل تلقائيًا إلى WebP لتسريع الصفحة. بعد الرفع اضغط «حفظ ونشر».</p>`
+};
+
+function draw(){
+  $('#lg').hidden=true;$('#app').hidden=false;
+  $('#nav').innerHTML=Object.entries(T).map(([k,v])=>`<button data-a="tab" data-t="${k}" class="${k===tab?'on':''}">${v}</button>`).join('');
+  $('#main').innerHTML=V[tab]();
+}
+
+/* ===== الأحداث ===== */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const{a,n,i,d,t}=b.dataset;
+  if(a==='tab'){tab=t;draw()}
+  else if(a==='add'){L[n].push(n==='fees'?{n:'',p:''}:n==='features'?{icon:'✦',title:'',text:''}:{q:'',a:''});mark();draw()}
+  else if(a==='del'){if(confirm('حذف هذا العنصر؟')){L[n].splice(+i,1);mark();draw()}}
+  else if(a==='mv'){const A=L[n],j=+i+ +d;[A[i],A[j]]=[A[j],A[i]];mark();draw()}
+  else if(a==='save')save();
+  else if(a==='out'){delete localStorage.adm;location.reload()}
+  else if(a==='login')login();
+});
+document.addEventListener('input',e=>{
+  const t=e.target,d=t.dataset;
+  if(d.k)C[d.k]=d.t==='n'?(t.value===''?'':+t.value):d.t==='l'?t.value.split('\n').map(s=>s.trim()).filter(Boolean):t.value;
+  else if(d.l)L[d.l][d.i][d.f]=t.value;
+  else if(d.h)hero=t.value;
+  else return;
+  mark();
+});
+document.addEventListener('change',async e=>{
+  const t=e.target,w=t.dataset.up;if(!w||!t.files.length)return;
+  toast('جارٍ الرفع...');
+  try{
+    for(const f of t.files){
+      const n=await up(f,w!=='videos');
+      if(w==='hero')hero=n;else L[w].push(w==='gallery'?{src:n,caption:''}:{src:n,caption:'',poster:''});
+    }
+    mark();draw();toast('تم الرفع ✓ — لا تنس «حفظ ونشر»');
+  }catch(x){toast('فشل الرفع: '+x.message,1)}
+});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+
+async function login(){
+  S={token:$('#tk').value.trim(),repo:$('#rp').value.trim(),branch:$('#br').value.trim()||'main'};
+  try{await load();localStorage.adm=JSON.stringify(S)}catch(e){toast('تعذّر الدخول: '+e.message,1)}
+}
+if(S)load().catch(e=>{toast('تعذّر التحميل: '+e.message,1);$('#lg').hidden=false});
+</script>
+</body>
+</html>
